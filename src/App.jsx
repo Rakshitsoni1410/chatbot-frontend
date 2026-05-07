@@ -8,45 +8,74 @@ function App() {
 
   const sendMessage = async () => {
 
-    if (!message) return;
-
     try {
 
+      const token = localStorage.getItem("token");
+
+      console.log("TOKEN => ", token);
+
       const response = await axios.post(
-        `http://localhost:8080/api/chat/send?userId=1&message=${message}`
+        `http://localhost:8080/api/chat/send`,
+        null,
+        {
+          params: {
+            userId: 1,
+            message: message
+          },
+
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
       );
 
-      setChat([...chat, response.data]);
+      console.log(response.data);
+
+      setChat([
+        ...chat,
+        response.data
+      ]);
 
       setMessage("");
 
     } catch (error) {
+
       console.log(error);
+
     }
   };
 
   return (
-    <div style={{
-      maxWidth: "700px",
-      margin: "40px auto",
-      fontFamily: "Arial"
-    }}>
+
+    <div
+      style={{
+        maxWidth: "700px",
+        margin: "40px auto",
+        fontFamily: "Arial"
+      }}
+    >
 
       <h1 style={{ textAlign: "center" }}>
         🤖 AI Chatbot
       </h1>
 
-      <div style={{
-        border: "1px solid #ccc",
-        borderRadius: "10px",
-        padding: "20px",
-        height: "400px",
-        overflowY: "auto",
-        marginBottom: "20px"
-      }}>
+      <div
+        style={{
+          border: "1px solid #ccc",
+          borderRadius: "10px",
+          padding: "20px",
+          height: "400px",
+          overflowY: "auto",
+          marginBottom: "20px"
+        }}
+      >
 
         {chat.map((c, index) => (
-          <div key={index} style={{ marginBottom: "20px" }}>
+
+          <div
+            key={index}
+            style={{ marginBottom: "20px" }}
+          >
 
             <div>
               <strong>You:</strong> {c.message}
@@ -57,14 +86,17 @@ function App() {
             </div>
 
           </div>
+
         ))}
 
       </div>
 
-      <div style={{
-        display: "flex",
-        gap: "10px"
-      }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "10px"
+        }}
+      >
 
         <input
           type="text"
