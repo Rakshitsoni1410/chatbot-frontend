@@ -1,232 +1,522 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import toast, { Toaster } from "react-hot-toast";
 
-function App() {
+const API = "http://localhost:8080";
+
+export default function App() {
+
+  const [isLogin, setIsLogin] = useState(true);
+
+  const [name, setName] = useState("");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [token, setToken] = useState(
+    localStorage.getItem("token") || ""
+  );
+
   const [message, setMessage] = useState("");
+
   const [chat, setChat] = useState([]);
 
   const [loading, setLoading] = useState(false);
 
-  // =========================
-  // LOGIN
-  // =========================
-  const login = async () => {
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({
+      behavior: "smooth"
+    });
+  }, [chat]);
+
+  // ================= REGISTER =================
+
+  const register = async () => {
+
+    if (!name || !email || !password) {
+      toast.error("Fill all fields");
+      return;
+    }
+
     try {
-      const res = await axios.post("http://localhost:8080/api/auth/login", {
+
+      await axios.post(`${API}/api/auth/register`, {
+        name,
         email,
-        password,
+        password
       });
 
-      console.log("FULL RESPONSE =>", res.data);
+      toast.success("Registration Successful");
 
-      const jwt = res.data.token;
+      setIsLogin(true);
 
-      console.log("TOKEN =>", jwt);
-
-      localStorage.setItem("token", jwt);
-      setToken(jwt);
     } catch (err) {
-      console.log("Login Error:", err);
+
+      console.log(err);
+
+      toast.error("Registration Failed");
     }
   };
 
-  // =========================
-  // LOGOUT
-  // =========================
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken("");
-    setChat([]);
+  // ================= LOGIN =================
+
+  const login = async () => {
+
+    if (!email || !password) {
+      toast.error("Enter email and password");
+      return;
+    }
+
+    try {
+
+      const response = await axios.post(
+        `${API}/api/auth/login`,
+        {
+          email,
+          password
+        }
+      );
+
+      const jwt = response.data.token;
+
+      if (!jwt) {
+        toast.error("Token not received");
+        return;
+      }
+
+      localStorage.setItem("token", jwt);
+
+      setToken(jwt);
+
+      toast.success("Login Success");
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error("Invalid Credentials");
+    }
   };
 
-  // =========================
-  // SEND MESSAGE
-  // =========================
-  const sendMessage = async () => {
-    try {
-      const jwt = localStorage.getItem("token");
+  // ================= LOGOUT =================
 
-      const res = await axios.post(
-        "http://localhost:8080/api/chat/send",
+  const logout = () => {
+
+    localStorage.removeItem("token");
+
+    setToken("");
+
+    setChat([]);
+
+    toast.success("Logged out");
+  };
+
+  // ================= SEND MESSAGE =================
+
+  const sendMessage = async () => {
+
+    if (!message.trim()) return;
+
+    const userMessage = {
+      message,
+      response: "Typing..."
+    };
+
+    setChat((prev) => [...prev, userMessage]);
+
+    const jwt = localStorage.getItem("token");
+
+    try {
+
+      setLoading(true);
+
+      const response = await axios.post(
+        `${API}/api/chat/send`,
         null,
         {
           params: {
-            message: message,
+            message
           },
+
           headers: {
-            Authorization: `Bearer ${jwt}`,
-          },
-        },
+            Authorization: `Bearer ${jwt}`
+          }
+        }
       );
 
-      setChat((prev) => [...prev, res.data]);
+      setChat((prev) => {
+
+        const updated = [...prev];
+
+        updated[updated.length - 1] = response.data;
+
+        return updated;
+      });
+
       setMessage("");
-    } catch (err) {
-      console.log("Chat Error:", err);
+
+    } catch (error) {
+
+      console.log(error);
+
+      toast.error("Message failed");
+    } finally {
+
+      setLoading(false);
     }
   };
 
-  // =========================
-  // LOGIN UI
-  // =========================
+  // ================= ENTER =================
+
+  const handleKeyDown = (e) => {
+
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  };
+
+  // ================= AUTH PAGE =================
+
   if (!token) {
+
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h2>🔐 Login</h2>
+
+      <div style={styles.authContainer}>
+
+        <Toaster position="top-right" />
+
+        <div style={styles.authCard}>
+
+          <h1 style={styles.title}>
+            🤖 Smart AI Assistant
+          </h1>
+
+          <p style={styles.subtitle}>
+            Friendly chatbot for everyone
+          </p>
+
+          {!isLogin && (
+
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={styles.input}
+            />
+          )}
 
           <input
-            style={styles.input}
-            placeholder="Email"
+            type="email"
+            placeholder="Email Address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            style={styles.input}
           />
 
           <input
-            style={styles.input}
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            style={styles.input}
           />
 
-          <button style={styles.button} onClick={login} disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          <button
+            onClick={isLogin ? login : register}
+            style={styles.mainButton}
+          >
+            {isLogin ? "Login" : "Register"}
           </button>
+
+          <p style={styles.switchText}>
+
+            {isLogin
+              ? "Don't have account?"
+              : "Already have account?"}
+
+            <span
+              style={styles.switchBtn}
+              onClick={() => setIsLogin(!isLogin)}
+            >
+              {isLogin ? " Register" : " Login"}
+            </span>
+
+          </p>
+
         </div>
+
       </div>
     );
   }
 
-  // =========================
-  // CHAT UI
-  // =========================
-  return (
-    <div style={styles.container}>
-      <div style={styles.chatCard}>
-        <div style={styles.header}>
-          <h2>🤖 AI Chatbot</h2>
+  // ================= CHAT PAGE =================
 
-          <button onClick={logout} style={styles.logout}>
+  return (
+
+    <div style={styles.appContainer}>
+
+      <Toaster position="top-right" />
+
+      <div style={styles.chatContainer}>
+
+        {/* HEADER */}
+
+        <div style={styles.header}>
+
+          <div>
+            <h2 style={{ margin: 0 }}>
+              🤖 AI Assistant
+            </h2>
+
+            <small>
+              Always here to help
+            </small>
+          </div>
+
+          <button
+            onClick={logout}
+            style={styles.logoutButton}
+          >
             Logout
           </button>
+
         </div>
 
-        <div style={styles.chatBox}>
-          {chat.map((c, i) => (
-            <div key={i} style={styles.msgBlock}>
-              <div>
-                <b>You:</b> {c.message}
+        {/* CHAT BODY */}
+
+        <div style={styles.chatBody}>
+
+          {chat.length === 0 && (
+
+            <div style={styles.welcomeBox}>
+
+              <h2>👋 Welcome</h2>
+
+              <p>
+                Ask anything. I'm here to help everyone.
+              </p>
+
+            </div>
+          )}
+
+          {chat.map((c, index) => (
+
+            <div key={index}>
+
+              <div style={styles.userWrapper}>
+
+                <div style={styles.userBubble}>
+                  {c.message}
+                </div>
+
               </div>
-              <div>
-                <b>Bot:</b> {c.response}
+
+              <div style={styles.botWrapper}>
+
+                <div style={styles.botBubble}>
+                  {c.response}
+                </div>
+
               </div>
-              <hr />
+
             </div>
           ))}
+
+          <div ref={chatEndRef}></div>
+
         </div>
 
-        <div style={styles.inputRow}>
+        {/* INPUT */}
+
+        <div style={styles.inputArea}>
+
           <input
-            style={styles.input}
-            placeholder="Type message..."
+            type="text"
+            placeholder="Type your message..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={styles.chatInput}
           />
 
-          <button style={styles.button} onClick={sendMessage}>
-            Send
+          <button
+            onClick={sendMessage}
+            style={styles.sendButton}
+          >
+            {loading ? "..." : "Send"}
           </button>
+
         </div>
+
       </div>
+
     </div>
   );
 }
 
-// =========================
-// SIMPLE STYLES
-// =========================
 const styles = {
-  container: {
+
+  appContainer: {
+    height: "100vh",
+    background: "#ececf1",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    height: "100vh",
-    fontFamily: "Arial",
-    background: "#f5f5f5",
+    fontFamily: "Arial"
   },
 
-  card: {
-    padding: "30px",
-    borderRadius: "10px",
+  chatContainer: {
+    width: "430px",
+    height: "90vh",
     background: "#fff",
-    boxShadow: "0 0 10px rgba(0,0,0,0.1)",
-    width: "300px",
-    textAlign: "center",
-  },
-
-  chatCard: {
-    width: "700px",
-    height: "600px",
-    background: "#fff",
-    borderRadius: "10px",
+    borderRadius: "20px",
     display: "flex",
     flexDirection: "column",
-    boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+    overflow: "hidden",
+    boxShadow: "0 10px 40px rgba(0,0,0,0.15)"
   },
 
   header: {
+    background: "#4f46e5",
+    color: "#fff",
+    padding: "18px",
     display: "flex",
     justifyContent: "space-between",
-    padding: "15px",
-    borderBottom: "1px solid #ddd",
+    alignItems: "center"
   },
 
-  chatBox: {
+  logoutButton: {
+    background: "#ef4444",
+    border: "none",
+    color: "#fff",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    cursor: "pointer"
+  },
+
+  chatBody: {
     flex: 1,
-    padding: "15px",
     overflowY: "auto",
+    padding: "20px",
+    background: "#f8fafc"
   },
 
-  inputRow: {
+  welcomeBox: {
+    textAlign: "center",
+    marginTop: "100px",
+    color: "#555"
+  },
+
+  userWrapper: {
     display: "flex",
-    padding: "10px",
+    justifyContent: "flex-end",
+    marginBottom: "15px"
+  },
+
+  botWrapper: {
+    display: "flex",
+    justifyContent: "flex-start",
+    marginBottom: "20px"
+  },
+
+  userBubble: {
+    background: "#4f46e5",
+    color: "#fff",
+    padding: "14px",
+    borderRadius: "18px",
+    maxWidth: "75%"
+  },
+
+  botBubble: {
+    background: "#e2e8f0",
+    color: "#111",
+    padding: "14px",
+    borderRadius: "18px",
+    maxWidth: "75%"
+  },
+
+  inputArea: {
+    display: "flex",
     gap: "10px",
+    padding: "15px",
     borderTop: "1px solid #ddd",
+    background: "#fff"
+  },
+
+  chatInput: {
+    flex: 1,
+    padding: "14px",
+    borderRadius: "14px",
+    border: "1px solid #ccc",
+    outline: "none"
+  },
+
+  sendButton: {
+    background: "#4f46e5",
+    color: "#fff",
+    border: "none",
+    borderRadius: "14px",
+    padding: "14px 18px",
+    cursor: "pointer"
+  },
+
+  authContainer: {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "linear-gradient(135deg,#4f46e5,#7c3aed)"
+  },
+
+  authCard: {
+    width: "340px",
+    background: "#fff",
+    padding: "35px",
+    borderRadius: "22px",
+    textAlign: "center",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+  },
+
+  title: {
+    marginBottom: "10px"
+  },
+
+  subtitle: {
+    color: "#666",
+    marginBottom: "25px"
   },
 
   input: {
-    flex: 1,
-    padding: "10px",
-    borderRadius: "6px",
+    width: "100%",
+    padding: "14px",
+    marginBottom: "15px",
+    borderRadius: "12px",
     border: "1px solid #ccc",
+    outline: "none"
   },
 
-  button: {
-    padding: "10px 15px",
+  mainButton: {
+    width: "100%",
+    padding: "14px",
+    background: "#4f46e5",
+    color: "#fff",
     border: "none",
-    background: "#007bff",
-    color: "white",
-    borderRadius: "6px",
+    borderRadius: "12px",
     cursor: "pointer",
+    fontSize: "16px"
   },
 
-  logout: {
-    padding: "6px 12px",
-    border: "none",
-    background: "red",
-    color: "white",
-    borderRadius: "6px",
-    cursor: "pointer",
+  switchText: {
+    marginTop: "18px",
+    color: "#555"
   },
 
-  msgBlock: {
-    marginBottom: "10px",
-  },
+  switchBtn: {
+    color: "#4f46e5",
+    cursor: "pointer",
+    fontWeight: "bold"
+  }
 };
-
-export default App;
